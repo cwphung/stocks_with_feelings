@@ -39,3 +39,33 @@ def clean_text(text):
 
     return text
 
+
+def get_next_day_return(tweet_timestamp, stock, stocks_df):
+    # market close = 4PM ET = 9PM UTC
+    # reset time for that date and add 21 hours to get 9PM UTC
+    market_close_utc = tweet_timestamp.normalize() + pd.Timedelta(hours = 21)
+
+    # if tweet timestamp is before market close, use same day
+    # if after, use next day
+    if tweet_timestamp <= market_close_utc:
+        tweet_date = tweet_timestamp.date()
+    else:
+        tweet_date = (tweet_timestamp + pd.Timedelta(days=1)).date()
+
+    # filter stock data by stock so date query is more efficient
+    stock_data = stocks_df[stocks_df['Stock Name'] == stock]
+
+    # get closing prices for tweet date and day after tweet date
+    tweet_day_close = stock_data.loc[stock_data['Date'] == tweet_date, 'Close']
+    next_day_close = stock_data.loc[stock_data['Date'] == tweet_date + pd.Timedelta(days=1), 'Close']
+
+    # if we don't have data for that stock and date, return none
+    if tweet_day_close.empty or next_day_close.empty:
+        return None
+
+    # get value
+    tweet_day_close = tweet_day_close.values[0]
+    next_day_close = next_day_close.values[0]
+
+    # compute return
+    return (next_day_close - tweet_day_close) / tweet_day_close
