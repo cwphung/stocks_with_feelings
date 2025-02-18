@@ -23,7 +23,7 @@ def download_dataset_to_df(url: str, file_path: str) -> pd.DataFrame:
         )
 
 
-def clean_text(text):
+def clean_text(text: str) -> str:
     # tweet specific cleaning
     text = re.sub(r"http\S+|www\S+|https\S+", "", text, flags=re.MULTILINE)  # remove urls
     text = re.sub(r"@\w+", "", text)  # remove mentions
@@ -69,3 +69,24 @@ def get_next_day_return(tweet_timestamp, stock, stocks_df):
 
     # compute return
     return (next_day_close - tweet_day_close) / tweet_day_close
+
+
+def assign_labels(next_day_return: float, sd_of_returns: float) -> float:
+    """
+    Assign a label from [-1, 0, 1] based on the next day return. Returns are normalized based on the standard deviation
+    of returns for that specific ticker, such that a return that is within (threshold) standard deviations of 0 will be
+    labeled 0.
+    """
+    threshold = 0.3  # tune this to get a reasonable balance of label counts
+    normalized_return = next_day_return / sd_of_returns
+    if normalized_return >= threshold:
+        return 1
+    if normalized_return <= -threshold:
+        return -1
+    return 0
+
+
+def get_sd_of_returns(ticker: str, stocks_df: pd.DataFrame) -> float:
+    df = stocks_df.loc[stocks_df['Stock Name'] == ticker]
+    df['daily_return'] = df['Adj Close'].pct_change() # SettingWithCopyWarning irrelevant because we just discard df after
+    return df['daily_return'].std()
