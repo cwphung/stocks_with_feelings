@@ -27,7 +27,7 @@ def clean_stock_data(df: pd.DataFrame) -> pd.DataFrame:
     pd.to_datetime(df['date'])
     df.sort_values(by='date', inplace=True)
     df.ffill(inplace=True)
-    return df
+    return df.copy()
 
 
 def simple_moving_average(df: pd.DataFrame, days=20) -> pd.Series:
@@ -146,6 +146,104 @@ def calculate_closing_diff(df: pd.DataFrame) -> tuple:
     delta.loc[0] = 0
 
     return pd.Series(delta)
+
+def moving_max(df: pd.DataFrame, days=30) -> pd.Series:
+    '''
+    ### Description
+    Calculates the moving max of a stock.
+    
+    ### Parameters
+    - df (pd.DataFrame)
+    - days (int)
+
+    ### Returns:
+    - (pd.Series)
+    '''
+    return df['close'].rolling(window=days, min_periods=1).max()
+
+def moving_min(df: pd.DataFrame, days=30) -> pd.Series:
+    '''
+    ### Description
+    Calculates the moving min of a stock.
+    
+    ### Parameters
+    - df (pd.DataFrame)
+    - days (int)
+
+    ### Returns:
+    - (pd.Series)
+    '''
+    return df['close'].rolling(window=days, min_periods=1).min()
+
+def moving_avg_volume(df: pd.DataFrame, days=30) -> pd.Series:
+    '''
+    ### Description
+    Calculates the moving avg trade volume of a stock.
+    
+    ### Parameters
+    - df (pd.DataFrame)
+    - days (int)
+
+    ### Returns:
+    - (pd.Series)
+    '''
+    return df['volume'].rolling(window=days, min_periods=1).mean()
+
+def moving_avg_HL(df: pd.DataFrame, days=30) -> pd.Series:
+    '''
+    ### Description
+    Calculates the moving avg trade volume of a stock.
+    
+    ### Parameters
+    - df (pd.DataFrame)
+    - days (int)
+
+    ### Returns:
+    - (pd.Series)
+    '''
+    return (df['high']-df['low']).rolling(window=days, min_periods=1).mean()
+
+def normalize_close(df: pd.DataFrame) -> pd.Series:
+    '''
+    ### Description
+    Calculates the closing price of a stock normalized to the window's high/low closing prices.
+    
+    ### Parameters
+    - df (pd.DataFrame)
+    - days (int)
+
+    ### Returns:
+    - (pd.Series)
+    '''
+    return (df['close']-df['moving_min'])/(df['moving_max'] - df['moving_min'])
+
+def normalize_volume(df: pd.DataFrame) -> pd.Series:
+    '''
+    ### Description
+    Calculates the trade volume of a stock normalized to the window's high/low trade volume.
+    
+    ### Parameters
+    - df (pd.DataFrame)
+    - days (int)
+
+    ### Returns:
+    - (pd.Series)
+    '''
+    return (df['volume']-df['moving_avg_volume'])/df['moving_avg_volume']
+
+def normalize_HL(df: pd.DataFrame) -> pd.Series:
+    '''
+    ### Description
+    Calculates the daily variation of a stock price normalized to the window's high/low daily variation.
+    
+    ### Parameters
+    - df (pd.DataFrame)
+    - days (int)
+
+    ### Returns:
+    - (pd.Series)
+    '''
+    return (df['high']-df['low'])/df['moving_avg_HL']
 
 def generate_LSTM_data(data, sequence_size, target_idx):
     '''
