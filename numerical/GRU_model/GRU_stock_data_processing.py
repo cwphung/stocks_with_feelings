@@ -9,10 +9,10 @@ import pandas as pd
 import numpy as np
 
 
-def clean_stock_data(df: pd.DataFrame) -> pd.DataFrame:
+def clean_stock_data(df: pd.DataFrame, window=30) -> pd.DataFrame:
     '''
     ### Description
-    Cleans and filters stock data for a given ticker symbol.
+    Cleans and filters stock data for a given ticker symbol. Generates moving averages.
     
     ### Parameters
     - df (pd.DataFrame):
@@ -27,7 +27,12 @@ def clean_stock_data(df: pd.DataFrame) -> pd.DataFrame:
     pd.to_datetime(df['date'])
     df.sort_values(by='date', inplace=True)
     df.ffill(inplace=True)
-    return df.copy()
+    moving_df = df.copy()
+    moving_df['moving_max'] = moving_max(df, days=window)
+    moving_df['moving_min'] = moving_min(df, days=window)
+    moving_df['moving_avg_volume'] = moving_avg_volume(df, days=window)
+    moving_df['moving_avg_HL'] = moving_avg_HL(df, days=window)
+    return moving_df.copy()
 
 
 def simple_moving_average(df: pd.DataFrame, days=20) -> pd.Series:
@@ -264,3 +269,28 @@ def generate_LSTM_data(data, sequence_size, target_idx, pred_size=1):
         data_y.append(data[i:i+pred_size, target_idx])
 
     return np.array(data_X).astype(np.float32), np.array(data_y).astype(np.float32)
+
+def gen_features(df: pd.DataFrame):
+    '''
+    ### Description
+    Generates stock features using above functions and returns new pd dataframe containing these features.
+    
+    ### Parameters
+    - df (pd.DataFrame)
+
+    ### Returns:
+    - df (pd.DataFrame)
+    '''
+    features = pd.DataFrame()
+    #normalize close, volume, high-low with respect to moving min/max
+    features['close'] = normalize_close(df)
+    features['volume'] = normalize_volume(df)
+    features['day_HL'] = normalize_HL(df)
+    #generate subsequent features using normalized close/volume/hl
+    features['sma'] = simple_moving_average(features)
+    features['ema'] = exponential_moving_average(features)
+    features['rsi'] = calculate_rsi(features)/10
+    features['macd_line'] , features['macd_signal'], features['macd_histogram'] = calculate_macd(features)
+    features['bb_middle'], features['bb_upper'], features['bb_lower'] = bollinger_bands(features)
+    features['target'] = calculate_closing_diff(features)
+    return features.copy()
