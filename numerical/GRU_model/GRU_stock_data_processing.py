@@ -245,7 +245,7 @@ def normalize_HL(df: pd.DataFrame) -> pd.Series:
     '''
     return (df['high']-df['low'])/df['moving_avg_HL']
 
-def generate_LSTM_data(data, sequence_size, target_idx):
+def generate_LSTM_data(data, sequence_size, target_idx, pred_size=1):
     '''
     ### Description
     Generates LSTM data.
@@ -259,8 +259,8 @@ def generate_LSTM_data(data, sequence_size, target_idx):
     '''
     data_X = []
     data_y = []
-    for i in range(sequence_size, data.shape[0]-1):
+    for i in range(sequence_size, data.shape[0]-pred_size):
         data_X.append(data[i-sequence_size:i, :data.shape[1]])
-        data_y.append(data[i, target_idx])
+        data_y.append(data[i:i+pred_size, target_idx])
 
     return np.array(data_X).astype(np.float32), np.array(data_y).astype(np.float32)
