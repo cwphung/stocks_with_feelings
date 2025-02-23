@@ -8,6 +8,11 @@ import re
 from nltk.corpus import stopwords
 import nltk
 nltk.download('stopwords')
+from torch.utils.data import DataLoader
+from transformers import BertForSequenceClassification
+import torch
+import torch.nn as nn
+import torch.optim as optim
 
 
 def download_dataset_to_df(url: str, file_path: str) -> pd.DataFrame:
@@ -52,23 +57,31 @@ def get_next_day_return(tweet_timestamp, stock, stocks_df):
     else:
         tweet_date = (tweet_timestamp + pd.Timedelta(days=1)).date()
 
-    # filter stock data by stock so date query is more efficient
+    # filter stock data by stock then sort by date
     stock_data = stocks_df[stocks_df['Stock Name'] == stock]
+    stock_data = stock_data.sort_values(by = 'Date')
 
-    # get closing prices for tweet date and day after tweet date
-    tweet_day_close = stock_data.loc[stock_data['Date'] == tweet_date, 'Close']
-    next_day_close = stock_data.loc[stock_data['Date'] == tweet_date + pd.Timedelta(days=1), 'Close']
-
+    # get closing prices for tweet date or closest day after
+    stock_day_data = stock_data.loc[stock_data['Date'] >= tweet_date]
     # if we don't have data for that stock and date, return none
-    if tweet_day_close.empty or next_day_close.empty:
+    if stock_day_data.empty:
         return None
+    stock_day_close = stock_day_data.iloc[0]['Adj Close']
+    stock_day = stock_day_data.iloc[0]['Date']
 
-    # get value
-    tweet_day_close = tweet_day_close.values[0]
-    next_day_close = next_day_close.values[0]
+    # set next day to day after stock date
+    next_day = stock_day + pd.Timedelta(days=1)
+
+    # get closing prices for next day or closest day after
+    next_day_data = stock_data.loc[stock_data['Date'] >= next_day]
+    # if we don't have data for that stock and date, return none
+    if next_day_data.empty:
+        return None
+    next_day_close = next_day_data.iloc[0]['Adj Close']
+    next_day = next_day_data.iloc[0]['Date']
 
     # compute return
-    return (next_day_close - tweet_day_close) / tweet_day_close
+    return (next_day_close - stock_day_close) / stock_day_close
 
 
 def assign_labels(next_day_return: float, sd_of_returns: float) -> float:
