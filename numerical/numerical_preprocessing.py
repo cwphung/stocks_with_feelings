@@ -7,9 +7,76 @@ Stock Data Processing Functions
 
 import pandas as pd
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 
 
-def clean_stock_data(df: pd.DataFrame, ticker: None) -> pd.DataFrame:
+def preprocess_stock_data(
+        data: pd.DataFrame, 
+        feature_cols=['percent_open', 'percent_high', 'percent_low', 
+                      'percent_close', 'volume', 'rdr', 
+                      'sma', 'ema', 'rsi', 'macd', 
+                      'bb_upper', 'bb_lower', 'future_close'],
+        prev_days=20,
+        future_days=1,
+        test_size=30
+    ):
+    '''
+    ### Description
+    Complete preprocessing of multiple stock data. 
+    Includes data filtering, cleaning, calculation of KPI features, 
+    normalization, and train/test split. Returns train and test 
+    datasets for a stock prediction model.
+    
+    ### Parameters
+    - data (np.array): Convert Pandas DataFrame to Numpy array.
+    - feature_cols (list): Feature columns to include in dataset.
+    - prev_days (int): Number of days the model can use for prediction.
+    - future_days (int): Number of days the model will predict.
+    - test_size (int): Number of days in the test set.
+
+    ### Returns:
+    - np.array: Training x data (features)
+    - np.array: Training y data (prediction)
+    - np.array: Testing x data (features)
+    - np.array: Training y data (prediction)
+    '''
+    train_x = []
+    train_y = []
+    test_x = []
+    test_y = []
+    tickers = data['Stock Name'].unique()
+    for ticker in tickers:
+        # Filter for stock data
+        stock_data = data[data['Stock Name'] == ticker]
+        # Clean data
+        stock_data = clean_stock_data(stock_data, ticker=None)
+        # Calculate percent change between trading days
+        stock_data['percent_open'], stock_data['percent_high'], stock_data['percent_low'], stock_data['percent_close'] = percent_price_change(stock_data)
+        # Calculate technical indicators
+        stock_data['rdr'] = relative_daily_range(stock_data)
+        stock_data['sma'] = simple_moving_average(stock_data)
+        stock_data['ema'] = exponential_moving_average(stock_data)
+        stock_data['rsi'] = calculate_rsi(stock_data)
+        stock_data['macd_line'] , stock_data['macd_signal'], stock_data['macd'] = calculate_macd(stock_data)
+        stock_data['bb_middle'], stock_data['bb_upper'], stock_data['bb_lower'] = bollinger_bands(stock_data)
+        stock_data['future_close'] = calculate_future_close(stock_data)
+        stock_data.dropna(inplace=True)
+        # Normalize features
+        scaler = MinMaxScaler()
+        stock_data[feature_cols] = scaler.fit_transform(stock_data[feature_cols])
+        stock_data = stock_data[feature_cols]
+        # Generate training & test data
+        stock_np = stock_data.to_numpy()
+        stock_x, stock_y = generate_model_data(stock_np, sequence_size=prev_days, target_idx=-1, pred_size=future_days)
+        train_x.append(stock_x[:-test_size])
+        train_y.append(stock_y[:-test_size])
+        test_x.append(stock_x[-test_size:])
+        test_y.append(stock_y[-test_size:])
+    # Return training and testing sets
+    return np.vstack(train_x), np.vstack(train_y), np.vstack(test_x), np.vstack(test_y)
+
+
+def clean_stock_data(df: pd.DataFrame, ticker: str = None) -> pd.DataFrame:
     '''
     ### Description
     Cleans and filters stock data for a given ticker symbol.
@@ -18,14 +85,15 @@ def clean_stock_data(df: pd.DataFrame, ticker: None) -> pd.DataFrame:
     - df (pd.DataFrame):
         The original stock dataset containing multiple stock entries.
     - ticker (str):
-        Ticker symbol for a specific stock, if the dataset contains multiple stocks.
+        Ticker symbol for a specific stock, if the dataset contains multiple stocks. 
+        If None, no filtering is applied.
 
     ### Returns:
     - (pd.DataFrame):
         A cleaned DataFrame containing only the specified stock's data, 
         with formatted columns, sorted dates, and missing values handled.
     '''
-    if ticker:
+    if ticker is not None:
         df = df[df['Stock Name'] == ticker]
         df = df.drop(columns=['Stock Name'])
     df.columns = df.columns.str.lower().str.replace(' ', '_')
@@ -34,6 +102,26 @@ def clean_stock_data(df: pd.DataFrame, ticker: None) -> pd.DataFrame:
     df.ffill(inplace=True)
     return df
 
+
+def percent_price_change(df: pd.DataFrame) -> tuple:
+    '''
+    ### Description
+    Calculates the percent change in price from the previous day closing price.
+    
+    ### Parameters
+    - df (pd.DataFrame)
+
+    ### Returns:
+    - (pd.Series): Percent Open
+    - (pd.Series): Percent High
+    - (pd.Series): Percent Low
+    - (pd.Series): Percent Close
+    '''
+    perc_open = (df["open"] - df["close"].shift(1)) / df["close"].shift(1) * 100
+    perc_high = (df["high"] - df["close"].shift(1)) / df["close"].shift(1) * 100
+    perc_low = (df["low"] - df["close"].shift(1)) / df["close"].shift(1) * 100
+    perc_close = (df["close"] - df["close"].shift(1)) / df["close"].shift(1) * 100
+    return perc_open, perc_high, perc_low, perc_close
 
 def simple_moving_average(df: pd.DataFrame, days=20) -> pd.Series:
     '''
@@ -157,6 +245,7 @@ def relative_daily_range(df: pd.DataFrame, days=20):
 def calculate_closing_diff(df: pd.DataFrame) -> tuple:
     '''
     ### Description
+    DEPRICATED.
     Calculates the change in closing price between days.
     
     ### Parameters
@@ -171,9 +260,25 @@ def calculate_closing_diff(df: pd.DataFrame) -> tuple:
     return pd.Series(delta)
 
 
+def calculate_future_close(df: pd.DataFrame) -> tuple:
+    '''
+    ### Description
+    Calculates the next day percent change in closing price.
+    
+    ### Parameters
+    - df (pd.DataFrame)
+
+    ### Returns:
+    - (pd.Series)
+    '''
+    future_close = (df["close"].shift(-1) - df["close"]) / df["close"] * 100
+    return future_close
+
+
 def calculate_moving_normalized(df: pd.DataFrame, feat: str, days=30) -> pd.Series:
     '''
     ### Description
+    DEPRICATED.
     Calculates normalized values of a feature based on a moving window.
     
     ### Parameters
@@ -198,17 +303,16 @@ def generate_model_data(data: np.array, sequence_size=20, target_idx=-1, pred_si
     ### Parameters
     - data (np.array): Convert Pandas DataFrame to Numpy array.
     - sequence_size (int): Number of previous day model can see.
-    - target_idx (int): Index of current day.
+    - target_idx (int): Index of target column.
     - pred_size (int): Size of output.
 
     ### Returns:
-    - np.array: X data (features)
-    - np.array: Y data (prediction)
+    - list: X data (features)
+    - list: Y data (prediction)
     '''
-    data_X = []
+    data_x = []
     data_y = []
     for i in range(sequence_size, data.shape[0]-pred_size):
-        data_X.append(data[i-sequence_size:i, :data.shape[1]])
-        data_y.append(data[i:i+pred_size, target_idx])
-
-    return np.array(data_X).astype(np.float32), np.array(data_y).astype(np.float32)
+        data_x.append(data[i-sequence_size:i, :data.shape[1]].tolist())
+        data_y.append(data[i:i+pred_size, target_idx].tolist())
+    return np.array(data_x).astype(np.float32), np.array(data_y).astype(np.float32)
