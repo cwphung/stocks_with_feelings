@@ -250,3 +250,22 @@ def generate_model_data(data: np.array, sequence_size=20, target_idx=-1, pred_si
         data_x.append(data[i-sequence_size:i, :data.shape[1]].tolist())
         data_y.append(data[i:i+pred_size, target_idx].tolist())
     return np.array(data_x).astype(np.float32), np.array(data_y).astype(np.float32)
+
+def generate_feature_data(data: np.array, sequence_size=20, pred_size=1):
+    '''
+    ### Description
+    Formats feature data to train and test a stock prediction model.
+    
+    ### Parameters
+    - data (np.array): Convert Pandas DataFrame to Numpy array.
+    - sequence_size (int): Number of previous day model can see.
+    - pred_size (int): Size of output.
+
+    ### Returns:
+    - list: X data (features)
+    - list: Y data (prediction)
+    '''
+    data_x = []
+    for i in range(sequence_size, data.shape[0]-pred_size):
+        data_x.append(data[i-sequence_size:i, :data.shape[1]].tolist())
+    return np.array(data_x).astype(np.float32)
