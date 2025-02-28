@@ -103,3 +103,11 @@ def get_sd_of_returns(ticker: str, stocks_df: pd.DataFrame) -> float:
     df = stocks_df.loc[stocks_df['Stock Name'] == ticker]
     df['daily_return'] = df['Adj Close'].pct_change() # SettingWithCopyWarning irrelevant because we just discard df after
     return df['daily_return'].std()
+
+def mean_predicted_label_by_day(predictions_df):
+    # group predictions by date and compute the mean of predicted labels
+    predictions_df['Date'] = pd.to_datetime(predictions_df['Date'], utc=True).dt.date
+    mean_df = predictions_df.groupby('Date', as_index=False)['predicted_label'].mean()
+    mean_df = mean_df[['Date', 'predicted_label']]
+
+    return mean_df
