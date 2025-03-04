@@ -8,7 +8,7 @@ Stock Data Processing Functions
 import pandas as pd
 
 
-def clean_stock_data(df: pd.DataFrame) -> pd.DataFrame:
+def clean_stock_data(df: pd.DataFrame, ticker: None) -> pd.DataFrame:
     '''
     ### Description
     Cleans and filters stock data for a given ticker symbol.
@@ -16,15 +16,20 @@ def clean_stock_data(df: pd.DataFrame) -> pd.DataFrame:
     ### Parameters
     - df (pd.DataFrame):
         The original stock dataset containing multiple stock entries.
+    - ticker (str):
+        Ticker symbol for a specific stock, if the dataset contains multiple stocks.
 
     ### Returns:
     - (pd.DataFrame):
         A cleaned DataFrame containing only the specified stock's data, 
         with formatted columns, sorted dates, and missing values handled.
     '''
+    if ticker:
+        df = df[df['Stock Name'] == ticker]
+        df = df.drop(columns=['Stock Name'])
     df.columns = df.columns.str.lower().str.replace(' ', '_')
     pd.to_datetime(df['date'])
-    df.sort_values(by='date', inplace=True)
+    df.sort_values(by=['date'], ignore_index=True, inplace=True)
     df.ffill(inplace=True)
     return df
 
