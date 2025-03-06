@@ -139,7 +139,7 @@ def bollinger_bands(df: pd.DataFrame, days=20) -> tuple:
 def calculate_closing_diff(df: pd.DataFrame) -> tuple:
     '''
     ### Description
-    Calculates the change in closing price between days.
+    Calculates the percent change in closing price between days.
     
     ### Parameters
     - df (pd.DataFrame)
@@ -148,8 +148,8 @@ def calculate_closing_diff(df: pd.DataFrame) -> tuple:
     - (pd.Series)
     '''
     delta = df['close'].diff(1)
+    delta = 100*delta/df['close'].shift(periods=1, fill_value=0)
     delta.loc[0] = 0
-
     return pd.Series(delta)
 
 def moving_max(df: pd.DataFrame, days=30) -> pd.Series:
@@ -211,7 +211,7 @@ def moving_avg_HL(df: pd.DataFrame, days=30) -> pd.Series:
 def normalize_close(df: pd.DataFrame) -> pd.Series:
     '''
     ### Description
-    Calculates the closing price of a stock normalized to the window's high/low closing prices.
+    Calculates the closing price of a stock as accumulated percent deltas.
     
     ### Parameters
     - df (pd.DataFrame)
@@ -220,7 +220,9 @@ def normalize_close(df: pd.DataFrame) -> pd.Series:
     ### Returns:
     - (pd.Series)
     '''
-    return (df['close']-df['moving_min'])/(df['moving_max'] - df['moving_min'])
+    accum = df['target'].cumsum()
+    accum = accum/accum.mean()
+    return accum
 
 def normalize_volume(df: pd.DataFrame) -> pd.Series:
     '''
@@ -283,14 +285,14 @@ def gen_features(df: pd.DataFrame):
     '''
     features = pd.DataFrame()
     #normalize close, volume, high-low with respect to moving min/max
-    features['close'] = normalize_close(df)
+    features['target'] = calculate_closing_diff(df)
+    features['close'] = normalize_close(features)
     features['volume'] = normalize_volume(df)
     features['day_HL'] = normalize_HL(df)
     #generate subsequent features using normalized close/volume/hl
     features['sma'] = simple_moving_average(features)
     features['ema'] = exponential_moving_average(features)
-    features['rsi'] = calculate_rsi(features)/10
+    features['rsi'] = calculate_rsi(features)/50
     features['macd_line'] , features['macd_signal'], features['macd_histogram'] = calculate_macd(features)
     features['bb_middle'], features['bb_upper'], features['bb_lower'] = bollinger_bands(features)
-    features['target'] = calculate_closing_diff(features)
     return features.copy()
