@@ -45,7 +45,7 @@ def clean_text(text: str) -> str:
     return text
 
 
-def get_next_day_return(tweet_timestamp, stock, stocks_df):
+def get_future_return(tweet_timestamp, stock, stocks_df, future_days=1):
     # market close = 4PM ET = 9PM UTC
     # reset time for that date and add 21 hours to get 9PM UTC
     market_close_utc = tweet_timestamp.normalize() + pd.Timedelta(hours = 21)
@@ -70,7 +70,7 @@ def get_next_day_return(tweet_timestamp, stock, stocks_df):
     stock_day = stock_day_data.iloc[0]['Date']
 
     # set next day to day after stock date
-    next_day = stock_day + pd.Timedelta(days=1)
+    next_day = stock_day + pd.Timedelta(days=future_days)
 
     # get closing prices for next day or closest day after
     next_day_data = stock_data.loc[stock_data['Date'] >= next_day]
@@ -84,19 +84,17 @@ def get_next_day_return(tweet_timestamp, stock, stocks_df):
     return (next_day_close - stock_day_close) / stock_day_close
 
 
-def assign_labels(next_day_return: float, sd_of_returns: float) -> float:
+def assign_labels(future_return, threshold=0.01):
     """
     Assign a label from [-1, 0, 1] based on the next day return. Returns are normalized based on the standard deviation
     of returns for that specific ticker, such that a return that is within (threshold) standard deviations of 0 will be
     labeled 0.
     """
-    threshold = 0.3  # tune this to get a reasonable balance of label counts
-    normalized_return = next_day_return / sd_of_returns
-    if normalized_return >= threshold:
-        return 1
-    if normalized_return <= -threshold:
-        return -1
-    return 0
+    if future_return >= threshold:
+        return 2
+    if future_return <= -threshold:
+        return 0
+    return 1
 
 
 def get_sd_of_returns(ticker: str, stocks_df: pd.DataFrame) -> float:
