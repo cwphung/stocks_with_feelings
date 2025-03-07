@@ -24,7 +24,7 @@ def clean_stock_data(df: pd.DataFrame, window=30) -> pd.DataFrame:
         with formatted columns, sorted dates, and missing values handled.
     '''
     df.columns = df.columns.str.lower().str.replace(' ', '_')
-    pd.to_datetime(df['date'])
+    pd.to_datetime(df['date'], utc=True).dt.date
     df.sort_values(by='date', inplace=True)
     df.ffill(inplace=True)
     moving_df = df.copy()
